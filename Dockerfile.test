@@ -1,0 +1,16 @@
+# Dockerfile per i test
+FROM maven:3.9.10-eclipse-temurin-17
+
+WORKDIR /app
+
+# Copia i file di configurazione Maven
+COPY pom.xml ./
+
+# Scarica le dipendenze
+RUN mvn dependency:go-offline -B
+
+# Copia il codice sorgente
+COPY src ./src
+
+# Comando per eseguire i test con profilo Docker
+CMD ["mvn", "test", "-Dspring.profiles.active=docker"]

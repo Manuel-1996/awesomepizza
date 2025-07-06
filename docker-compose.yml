@@ -1,0 +1,87 @@
+services:
+  app:
+    container_name: app_awesomepizza
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - '${PORT}:${PORT}'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      schema-init:
+        condition: service_completed_successfully
+    networks:
+      - app-network
+
+  schema-init:
+    image: postgres:15
+    container_name: schema_init_awesomepizza
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    volumes:
+      - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    command: >
+      bash -c "
+        echo 'Inizializzazione schema pizzeria...'
+        PGPASSWORD='${DB_PASSWORD}' psql -h postgres -p ${DB_PORT} -U '${DB_USERNAME}' -d '${DB_DATABASE}' -f /docker-entrypoint-initdb.d/schema.sql
+        echo 'Schema pizzeria creato con successo!'
+      "
+
+  test:
+    container_name: test_awesomepizza
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    env_file:
+      - .env  # Utilizza variabili d'ambiente specifiche per i test
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+    volumes:
+      - ./src:/app/src
+      - ./target:/app/target
+    profiles: ["test"]  # Questo servizio non verrà avviato con docker-compose up
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    environment:
+      - MAVEN_OPTS=-Xmx768m -Xms256m
+
+  postgres:
+    image: postgres:15
+    container_name: postgres_awesomepizza
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: '${DB_USERNAME}'
+      POSTGRES_PASSWORD: '${DB_PASSWORD}'
+      POSTGRES_DB: '${DB_DATABASE}'
+    ports:
+      - '${DB_PORT}:${DB_PORT}'
+    command: -p ${DB_PORT}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE} -p ${DB_PORT}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+
+networks:
+  app-network:
+    driver: bridge
