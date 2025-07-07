@@ -223,7 +223,7 @@ docker-compose up -d schema-init
 # (modifica src/main/resources/application.properties se necessario)
 
 # 5. Compila e installa dipendenze
-mvn clean install
+mvn clean install (aggiungere -DskipTests se si vogliono saltare i test)
 
 # 6. Avvia l'applicazione
 mvn spring-boot:run
